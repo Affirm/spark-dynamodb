@@ -6,7 +6,7 @@ version := "0.4.4-SNAPSHOT"
 
 description := "Plug-and-play implementation of an Apache Spark custom data source for AWS DynamoDB."
 
-scalaVersion := "2.12.7"
+scalaVersion := "2.11.12"
 
 crossScalaVersions := Seq("2.11.12", "2.12.7")
 

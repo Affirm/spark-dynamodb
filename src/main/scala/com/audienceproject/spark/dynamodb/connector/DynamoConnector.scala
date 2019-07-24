@@ -29,7 +29,7 @@ import com.amazonaws.services.securitytoken.AWSSecurityTokenServiceClientBuilder
 import com.amazonaws.services.securitytoken.model.AssumeRoleRequest
 import org.apache.spark.sql.sources.Filter
 
-private[dynamodb] trait DynamoConnector {
+trait DynamoConnector {
 
     def getDynamoDB(region: Option[String] = None, roleArn: Option[String] = None): DynamoDB = {
         val client: AmazonDynamoDB = getDynamoDBClient(region, roleArn)

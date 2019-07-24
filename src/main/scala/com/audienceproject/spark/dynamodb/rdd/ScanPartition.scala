@@ -32,7 +32,7 @@ import org.apache.spark.sql.types.{StructField, StructType}
 import scala.annotation.tailrec
 import scala.collection.JavaConverters._
 
-private[dynamodb] class ScanPartition(schema: StructType,
+class ScanPartition(schema: StructType,
                                       partitionIndex: Int,
                                       connector: DynamoConnector)
     extends Partition with Serializable {
@@ -77,6 +77,46 @@ private[dynamodb] class ScanPartition(schema: StructType,
                 val page = pageIterator.next()
                 prevConsumedCapacity = Option(page.getLowLevelResult.getScanResult.getConsumedCapacity)
                 innerIterator = page.getLowLevelResult.getItems.iterator().asScala.map(itemToRow(requiredColumns))
+            }
+
+        }
+    }
+
+    def scanTableAsJson(requiredColumns: Seq[String], filters: Seq[Filter]): Iterator[String] = {
+
+        if (connector.isEmpty) return Iterator.empty
+
+        val rateLimiter = RateLimiter.create(connector.readLimit)
+
+        val scanResult = connector.scan(index, requiredColumns, filters)
+
+        val pageIterator = scanResult.pages().iterator().asScala
+
+        new Iterator[String] {
+
+            var innerIterator: Iterator[String] = Iterator.empty
+            var prevConsumedCapacity: Option[ConsumedCapacity] = None
+
+            @tailrec
+            override def hasNext: Boolean = innerIterator.hasNext || {
+                if (pageIterator.hasNext) {
+                    nextPage()
+                    hasNext
+                }
+                else false
+            }
+
+            override def next(): String = innerIterator.next()
+
+            private def nextPage(): Unit = {
+                // Limit throughput to provisioned capacity.
+                prevConsumedCapacity
+                    .map(capacity => math.ceil(capacity.getCapacityUnits).toInt)
+                    .foreach(rateLimiter.acquire)
+
+                val page = pageIterator.next()
+                prevConsumedCapacity = Option(page.getLowLevelResult.getScanResult.getConsumedCapacity)
+                innerIterator = page.getLowLevelResult.getItems.iterator().asScala.map(i => i.toJSON())
             }
 
         }

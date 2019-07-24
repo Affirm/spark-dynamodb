@@ -25,12 +25,13 @@ import org.apache.spark.sql.Row
 import org.apache.spark.sql.sources.Filter
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.{Partition, SparkContext, TaskContext}
+import com.audienceproject.spark.dynamodb.connector.TableConnector
 
-private[dynamodb] class DynamoRDD(sc: SparkContext,
-                                  schema: StructType,
-                                  scanPartitions: Seq[ScanPartition],
-                                  requiredColumns: Seq[String] = Seq.empty,
-                                  filters: Seq[Filter] = Seq.empty)
+class DynamoRDD(sc: SparkContext,
+                schema: StructType,
+                scanPartitions: Seq[ScanPartition],
+                requiredColumns: Seq[String] = Seq.empty,
+                filters: Seq[Filter] = Seq.empty)
     extends RDD[Row](sc, Nil) {
 
     override def compute(split: Partition, context: TaskContext): Iterator[Row] = {
@@ -40,4 +41,28 @@ private[dynamodb] class DynamoRDD(sc: SparkContext,
 
     override protected def getPartitions: Array[Partition] = scanPartitions.toArray
 
+}
+
+class DynamoJsonRDD(sc: SparkContext,
+                scanPartitions: Seq[ScanPartition],
+                requiredColumns: Seq[String] = Seq.empty,
+                filters: Seq[Filter] = Seq.empty)
+    extends RDD[String](sc, Nil) {
+
+    override def compute(split: Partition, context: TaskContext): Iterator[String] = {
+        val scanPartition = split.asInstanceOf[ScanPartition]
+        scanPartition.scanTableAsJson(requiredColumns, filters)
+    }
+
+    override protected def getPartitions: Array[Partition] = scanPartitions.toArray
+
+}
+
+object DynamoRDD {
+    def tableScanRdd(sc: SparkContext, tableName: String, region: String, numPartitions: Int) = {
+        val connector = new TableConnector(tableName, numPartitions, Map("region" -> region))
+        val scanPartitions = List.range(0, numPartitions).map(partition =>
+            new ScanPartition(new StructType(), partition, connector))
+        new DynamoJsonRDD(sc, scanPartitions)
+    }
 }

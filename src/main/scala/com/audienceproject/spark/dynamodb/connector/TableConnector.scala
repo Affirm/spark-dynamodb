@@ -35,7 +35,7 @@ import org.apache.spark.sql.types._
 import scala.annotation.tailrec
 import scala.collection.JavaConverters._
 
-private[dynamodb] class TableConnector(tableName: String, totalSegments: Int, parameters: Map[String, String])
+class TableConnector(tableName: String, totalSegments: Int, parameters: Map[String, String])
     extends DynamoConnector with DynamoWritable with DynamoUpdatable with Serializable {
 
     private val consistentRead = parameters.getOrElse("stronglyConsistentReads", "false").toBoolean
@@ -58,7 +58,7 @@ private[dynamodb] class TableConnector(tableName: String, totalSegments: Int, pa
         // Provisioned or on-demand throughput.
         val readThroughput = Option(desc.getProvisionedThroughput.getReadCapacityUnits)
             .filter(_ > 0).map(_.longValue())
-            .getOrElse(100L)
+            .getOrElse(parameters.getOrElse("provisionedThroguhput", "100").toLong)
         val writeThroughput = Option(desc.getProvisionedThroughput.getWriteCapacityUnits)
             .filter(_ > 0).map(_.longValue())
             .getOrElse(100L)
